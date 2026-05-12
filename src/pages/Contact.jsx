@@ -47,6 +47,19 @@ function Contact() {
         lu:      false,
         createdAt: serverTimestamp(),
       });
+
+      // Envoyer les emails via Vercel Function
+      await fetch("/api/send-contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom:     form.nom,
+          email:   form.email,
+          sujet:   form.sujet || "Sans sujet",
+          message: form.message,
+        }),
+      });
+
       setLoading(false);
       setSent(true);
     } catch (error) {

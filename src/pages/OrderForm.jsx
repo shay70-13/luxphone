@@ -47,7 +47,7 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
 
     setLoading(true);
     try {
-      // 1. Sauvegarder la commande dans Firestore
+      // 1. Sauvegarder dans Firestore
       await addDoc(collection(db, "commandes"), {
         client: { ...form },
         articles: cartItems.map((i) => ({
@@ -60,6 +60,23 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
         paiement: payment,
         statut: "En attente",
         createdAt: serverTimestamp(),
+      });
+
+      // 2. Envoyer les emails via Vercel Function
+      await fetch("/api/send-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client: { ...form },
+          articles: cartItems.map((i) => ({
+            id: i.id, nom: i.name, marque: i.brand,
+            quantite: i.quantity, prix: i.price,
+          })),
+          sousTotal: total,
+          livraison: LIVRAISON,
+          totalFinal: total + LIVRAISON,
+          paiement: payment,
+        }),
       });
 
       setLoading(false);
