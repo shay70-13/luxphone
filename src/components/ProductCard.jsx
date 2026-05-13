@@ -1,4 +1,7 @@
+import { useState } from "react";
+
 function ProductCard({ product, onAdd }) {
+  const [imgError, setImgError] = useState(false);
   const fmt = (n) => n.toLocaleString("fr-FR") + " XAF";
 
   const badgeColors = {
@@ -11,40 +14,30 @@ function ProductCard({ product, onAdd }) {
 
   return (
     <div className="product-card">
-      {/* Badge */}
       {product.badge && (
-        <span
-          className="product-badge"
-          style={{ background: badgeColors[product.badge] || "var(--accent2)" }}
-        >
+        <span className="product-badge"
+          style={{ background: badgeColors[product.badge] || "var(--accent2)" }}>
           {product.badge}
         </span>
       )}
 
-      {/* Image */}
       <div className="product-img-wrap">
-        {product.image ? (
+        {!imgError && product.image ? (
           <img
             src={product.image}
             alt={product.name}
             className="product-photo"
-            onError={(e) => {
-              e.target.style.display = "none";
-              e.target.nextSibling.style.display = "flex";
-            }}
+            onError={() => setImgError(true)}
           />
-        ) : null}
-        <div className="product-emoji-fallback" style={{ display: "none" }}>
-          📱
-        </div>
+        ) : (
+          <div className="product-emoji-fallback">📱</div>
+        )}
       </div>
 
-      {/* Infos */}
       <div className="product-body">
         <p className="product-brand">{product.brand}</p>
         <h3 className="product-name">{product.name}</h3>
 
-        {/* Specs compactes */}
         <div className="product-specs">
           <span>📦 {product.storage}</span>
           <span>📷 {product.camera}</span>
