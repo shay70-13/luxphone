@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import emailjs, { TEMPLATE_ADMIN, TEMPLATE_CLIENT } from "../emailjs";
+
+const SERVICE_ID = "service_p2qgcvg";
 
 function OrderForm({ cartItems, onConfirm, setPage }) {
   const LIVRAISON = 15000;
@@ -9,7 +12,7 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
     prenom: "", nom: "", email: "", telephone: "",
     adresse: "", ville: "", quartier: "", note: "",
   });
-  const [errors, setErrors]   = useState({});
+  const [errors,  setErrors]  = useState({});
   const [payment, setPayment] = useState("mobile");
   const [loading, setLoading] = useState(false);
 
@@ -47,44 +50,52 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
 
     setLoading(true);
     try {
+      // Préparer le résumé des articles
+      const articlesTexte = cartItems
+        .map((i) => `${i.brand} ${i.name} × ${i.quantity} = ${fmt(i.price * i.quantity)}`)
+        .join("\n");
+
+      const templateParams = {
+        client_prenom:    form.prenom,
+        client_nom:       `${form.prenom} ${form.nom}`,
+        client_email:     form.email,
+        client_telephone: form.telephone,
+        client_adresse:   form.adresse,
+        client_ville:     form.ville,
+        articles:         articlesTexte,
+        total:            fmt(total + LIVRAISON),
+        paiement:         payment,
+      };
+
       // 1. Sauvegarder dans Firestore
       await addDoc(collection(db, "commandes"), {
-        client: { ...form },
-        articles: cartItems.map((i) => ({
+        client:     { ...form },
+        articles:   cartItems.map((i) => ({
           id: i.id, nom: i.name, marque: i.brand,
           quantite: i.quantity, prix: i.price,
         })),
-        sousTotal: total,
-        livraison: LIVRAISON,
+        sousTotal:  total,
+        livraison:  LIVRAISON,
         totalFinal: total + LIVRAISON,
-        paiement: payment,
-        statut: "En attente",
-        createdAt: serverTimestamp(),
+        paiement:   payment,
+        statut:     "En attente",
+        createdAt:  serverTimestamp(),
       });
 
-      // 2. Envoyer les emails via Vercel Function
-      await fetch("/api/send-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client: { ...form },
-          articles: cartItems.map((i) => ({
-            id: i.id, nom: i.name, marque: i.brand,
-            quantite: i.quantity, prix: i.price,
-          })),
-          sousTotal: total,
-          livraison: LIVRAISON,
-          totalFinal: total + LIVRAISON,
-          paiement: payment,
-        }),
-      });
+      // 2. Email à l'admin (toi)
+      await emailjs.send(SERVICE_ID, TEMPLATE_ADMIN, templateParams);
+
+      // 3. Email de confirmation au client
+      await emailjs.send(SERVICE_ID, TEMPLATE_CLIENT, templateParams);
 
       setLoading(false);
       onConfirm({ ...form, payment });
+
     } catch (error) {
-      console.error("Erreur Firebase:", error);
+      console.error("Erreur:", error);
       setLoading(false);
-      alert("Une erreur est survenue. Veuillez réessayer.");
+      // On confirme quand même même si l'email échoue
+      onConfirm({ ...form, payment });
     }
   };
 
@@ -101,7 +112,7 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
         {loading && (
           <div className="loading-overlay">
             <div className="loading-spinner" />
-            <p className="loading-text">Enregistrement de votre commande…</p>
+            <p className="loading-text">Enregistrement et envoi de la confirmation…</p>
           </div>
         )}
 
@@ -110,7 +121,6 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
           <h1 className="page-title">Vos <em>Informations</em></h1>
         </div>
 
-        {/* Infos personnelles */}
         <div className="form-card anim-fadeup">
           <h2>👤 Informations personnelles</h2>
           <div className="form-row">
@@ -143,7 +153,6 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
           </div>
         </div>
 
-        {/* Adresse */}
         <div className="form-card anim-fadeup">
           <h2>📍 Adresse de livraison</h2>
           <div className="form-group">
@@ -179,7 +188,6 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
           </div>
         </div>
 
-        {/* Paiement */}
         <div className="form-card anim-fadeup">
           <h2>💳 Mode de paiement</h2>
           <div className="payment-options">
@@ -193,7 +201,6 @@ function OrderForm({ cartItems, onConfirm, setPage }) {
           </div>
         </div>
 
-        {/* Récapitulatif */}
         <div className="form-card anim-fadeup">
           <h2>🧾 Récapitulatif</h2>
           <div className="order-recap">

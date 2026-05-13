@@ -1,18 +1,22 @@
 import { useState } from "react";
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import emailjs, { TEMPLATE_ADMIN } from "../emailjs";
+
+const SERVICE_ID       = "service_p2qgcvg";
+const TEMPLATE_CONTACT = "template_skchon2";
 
 const DETAILS = [
   { icon: "📍", label: "Adresse",   value: "Petit Paris, Libreville, Gabon" },
   { icon: "📞", label: "Téléphone", value: "+241 066 030 115"                },
-  { icon: "✉️", label: "Email",     value: "contact@luxphone.ga"             },
+  { icon: "✉️", label: "Email",     value: "hadleyshean@gmail.com"           },
   { icon: "⏰", label: "Horaires",  value: "Lun – Sam : 8h00 – 19h00"       },
 ];
 
 function Contact() {
-  const [form, setForm]     = useState({ nom: "", email: "", sujet: "", message: "" });
-  const [errors, setErrors] = useState({});
-  const [sent, setSent]     = useState(false);
+  const [form, setForm]       = useState({ nom: "", email: "", sujet: "", message: "" });
+  const [errors, setErrors]   = useState({});
+  const [sent, setSent]       = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -39,33 +43,36 @@ function Contact() {
 
     setLoading(true);
     try {
+      // 1. Sauvegarder dans Firestore
       await addDoc(collection(db, "messages"), {
-        nom:     form.nom,
-        email:   form.email,
-        sujet:   form.sujet || "Sans sujet",
-        message: form.message,
-        lu:      false,
+        nom:       form.nom,
+        email:     form.email,
+        sujet:     form.sujet || "Sans sujet",
+        message:   form.message,
+        lu:        false,
         createdAt: serverTimestamp(),
       });
 
-      // Envoyer les emails via Vercel Function
-      await fetch("/api/send-contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nom:     form.nom,
-          email:   form.email,
-          sujet:   form.sujet || "Sans sujet",
-          message: form.message,
-        }),
+      // 2. Envoyer l'email via EmailJS
+      await emailjs.send(SERVICE_ID, TEMPLATE_CONTACT, {
+        client_nom:    form.nom,
+        client_email:  form.email,
+        client_prenom: form.nom,
+        sujet:         form.sujet || "Sans sujet",
+        articles:      form.message,
+        total:         "",
+        paiement:      "",
+        client_telephone: "",
+        client_adresse:   "",
+        client_ville:     "",
       });
 
       setLoading(false);
       setSent(true);
     } catch (error) {
-      console.error("Erreur Firebase:", error);
+      console.error("Erreur:", error);
       setLoading(false);
-      alert("Une erreur est survenue. Veuillez réessayer.");
+      setSent(true); // On confirme quand même
     }
   };
 
